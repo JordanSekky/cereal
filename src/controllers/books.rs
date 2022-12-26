@@ -1,31 +1,33 @@
 use axum::{
     extract::{Query, State},
-    Json,
+    routing::{delete, get, post},
+    Json, Router,
 };
 use chrono::Utc;
+use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     error::Error,
-    models::books::{Book, BookMetadata, BooksClient},
+    models::{Book, BookClient, BookMetadata},
     AppState,
 };
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
-pub struct CreateBookRequest {
-    pub title: String,
-    pub author: String,
-    pub metadata: BookMetadata,
+struct CreateBookRequest {
+    title: String,
+    author: String,
+    metadata: BookMetadata,
 }
 
-pub async fn create_book_handler(
+async fn create_book_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateBookRequest>,
 ) -> Result<Json<Book>, Error> {
     let pool = state.pool;
-    let client = BooksClient::new(&pool);
+    let client = BookClient::new(&pool);
     let book = client
         .create_book(&request.title, &request.author, &request.metadata)
         .await?;
@@ -33,28 +35,28 @@ pub async fn create_book_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
-pub struct UpdateBookRequest {
-    pub id: Uuid,
-    pub title: Option<String>,
-    pub author: Option<String>,
+struct UpdateBookRequest {
+    id: Uuid,
+    title: Option<String>,
+    author: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
-pub struct UpdateBookResponse {
-    pub id: Uuid,
+struct UpdateBookResponse {
+    id: Uuid,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
+    title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub author: Option<String>,
-    pub updated_at: chrono::DateTime<Utc>,
+    author: Option<String>,
+    updated_at: chrono::DateTime<Utc>,
 }
 
-pub async fn update_book_handler(
+async fn update_book_handler(
     State(state): State<AppState>,
     Json(request): Json<UpdateBookRequest>,
 ) -> Result<Json<UpdateBookResponse>, Error> {
     let pool = state.pool;
-    let client = BooksClient::new(&pool);
+    let client = BookClient::new(&pool);
     let book = client
         .update_book(
             &request.id,
@@ -72,48 +74,58 @@ pub async fn update_book_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
-pub struct GetBookRequest {
-    pub id: Uuid,
+struct GetBookRequest {
+    id: Uuid,
 }
 
-pub async fn get_book_handler(
+async fn get_book_handler(
     State(state): State<AppState>,
     Query(request): Query<GetBookRequest>,
 ) -> Result<Json<Book>, Error> {
     let pool = state.pool;
-    let client = BooksClient::new(&pool);
+    let client = BookClient::new(&pool);
     let book = client.get_book(request.id).await?;
     match book {
         Some(x) => Ok(x.into()),
-        None => Err(Error::ResourceNotFound()),
+        None => Err(Error::ResourceNotFound {
+            resource_type: String::from("book"),
+            id: request.id.to_string(),
+        }),
     }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
-pub struct ListBooksResult {
-    pub books: Vec<Book>,
+struct ListBooksResult {
+    books: Vec<Book>,
 }
 
-pub async fn list_books_handler(
-    State(state): State<AppState>,
-) -> Result<Json<ListBooksResult>, Error> {
+async fn list_books_handler(State(state): State<AppState>) -> Result<Json<ListBooksResult>, Error> {
     let pool = state.pool;
-    let client = BooksClient::new(&pool);
+    let client = BookClient::new(&pool);
     let books = client.list_books().await?;
     Ok(ListBooksResult { books }.into())
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
-pub struct DeleteBookRequest {
-    pub id: Uuid,
+struct DeleteBookRequest {
+    id: Uuid,
 }
 
-pub async fn delete_book_handler(
+async fn delete_book_handler(
     State(state): State<AppState>,
     Json(request): Json<DeleteBookRequest>,
 ) -> Result<Json<serde_json::Value>, Error> {
     let pool = state.pool;
-    let client = BooksClient::new(&pool);
+    let client = BookClient::new(&pool);
     client.delete_book(request.id).await?;
     Ok(json!({}).into())
+}
+
+pub fn router() -> Router<AppState, Body> {
+    Router::new()
+        .route("/createBook", post(create_book_handler))
+        .route("/updateBook", post(update_book_handler))
+        .route("/getBook", get(get_book_handler))
+        .route("/listBooks", get(list_books_handler))
+        .route("/deleteBook", delete(delete_book_handler))
 }

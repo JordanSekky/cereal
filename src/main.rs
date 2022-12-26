@@ -1,14 +1,12 @@
-use axum::{
-    routing::{delete, get, post},
-    Router,
-};
+use axum::Router;
 use error::Result;
 mod models;
 use std::str::FromStr;
 use std::{fs, net::SocketAddr};
 mod controllers;
-use controllers::books;
+use controllers::{books, chapters, subscribers, subscriptions};
 mod error;
+mod util;
 
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
@@ -32,16 +30,18 @@ async fn main() -> Result<()> {
 
     let state = AppState { pool };
 
+    let subscribers = subscribers::router();
+    let books = books::router();
+    let chapters = chapters::router();
+    let subscriptions = subscriptions::router();
+
     let app = Router::new()
-        .route("/createBook", post(books::create_book_handler))
-        .route("/updateBook", post(books::update_book_handler))
-        .route("/getBook", get(books::get_book_handler))
-        .route("/listBooks", get(books::list_books_handler))
-        .route("/deleteBook", delete(books::delete_book_handler))
+        .merge(subscribers)
+        .merge(chapters)
+        .merge(books)
+        .merge(subscriptions)
         .with_state(state);
 
-    // run our app with hyper
-    // `axum::Server` is a re-export of `hyper::Server`
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -50,7 +50,6 @@ async fn main() -> Result<()> {
 }
 
 async fn new_db(pool: Pool<Sqlite>) -> Result<()> {
-    // Make a simple query to return the given parameter (use a question mark `?` instead of `$1` for MySQL)
     sqlx::query(&String::from_utf8_lossy(include_bytes!(
         "../create_tables.sql"
     )))

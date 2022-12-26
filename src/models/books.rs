@@ -7,7 +7,7 @@ use crate::error::{Error, Result};
 
 use super::decode_uuid;
 
-pub struct BooksClient {
+pub struct BookClient {
     pool: Pool<Sqlite>,
 }
 
@@ -20,6 +20,28 @@ pub enum BookMetadata {
     TheWanderingInnPatreon,
     TheDailyGrindPatreon,
     ApparatusOfChangePatreon,
+}
+
+impl TryFrom<(&SqliteRow, &str)> for BookMetadata {
+    type Error = sqlx::Error;
+
+    fn try_from(value: (&SqliteRow, &str)) -> core::result::Result<Self, Self::Error> {
+        let (row, index) = value;
+        let metadata: String = row.try_get(index)?;
+        let metadata =
+            serde_json::from_str(&metadata).map_err(|err| sqlx::Error::ColumnDecode {
+                index: index.into(),
+                source: Box::new(err),
+            })?;
+        Ok(metadata)
+    }
+}
+
+impl BookMetadata {
+    pub fn json(&self) -> Result<String> {
+        let json = serde_json::to_string(self)?;
+        Ok(json)
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -40,34 +62,16 @@ impl<'r> sqlx::FromRow<'r, SqliteRow> for Book {
             id: decode_uuid(row, "id")?,
             title: row.try_get("title")?,
             author: row.try_get("author")?,
-            metadata: decode_book_metadata(row, "metadata")?,
+            metadata: (row, "metadata").try_into()?,
             created_at: row.try_get("created_at")?,
             updated_at: row.try_get("updated_at")?,
         })
     }
 }
 
-fn decode_book_metadata(
-    row: &SqliteRow,
-    index: &str,
-) -> core::result::Result<BookMetadata, sqlx::Error> {
-    let book_metadata: String = row.try_get(index)?;
-    let book_metadata =
-        serde_json::from_str(&book_metadata).map_err(|err| sqlx::Error::ColumnDecode {
-            index: index.into(),
-            source: Box::new(err),
-        })?;
-    Ok(book_metadata)
-}
-
-fn encode_book_metadata(metadata: &BookMetadata) -> Result<String> {
-    let book_metadata = serde_json::to_string(metadata)?;
-    Ok(book_metadata)
-}
-
-impl BooksClient {
-    pub fn new(pool: &Pool<Sqlite>) -> BooksClient {
-        BooksClient { pool: pool.clone() }
+impl BookClient {
+    pub fn new(pool: &Pool<Sqlite>) -> BookClient {
+        BookClient { pool: pool.clone() }
     }
 
     pub async fn create_book(
@@ -84,7 +88,7 @@ impl BooksClient {
         .bind(Uuid::new_v4().as_bytes().as_slice())
         .bind(title)
         .bind(author)
-        .bind(encode_book_metadata(metadata)?)
+        .bind(metadata.json()?)
         .bind(Utc::now())
         .bind(Utc::now())
         .fetch_one(&self.pool)
@@ -114,7 +118,10 @@ impl BooksClient {
         .await?;
         match book {
             Some(x) => Ok(x),
-            None => Err(Error::ResourceNotFound()),
+            None => Err(Error::ResourceNotFound {
+                id: id.to_string(),
+                resource_type: String::from("book"),
+            }),
         }
     }
 

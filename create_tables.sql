@@ -10,8 +10,7 @@ CREATE TABLE books (
 CREATE TABLE chapters (
   id BLOB PRIMARY KEY NOT NULL,
   book_id BLOB NOT NULL,
-  name TEXT NOT NULL,
-  link TEXT NOT NULL,
+  title TEXT NOT NULL,
   metadata TEXT NOT NULL,
   html BLOB,
   epub BLOB,
@@ -23,6 +22,7 @@ CREATE TABLE chapters (
 
 CREATE TABLE subscribers (
   id BLOB PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
   kindle_email TEXT,
   pushover_key TEXT,
   created_at TEXT NOT NULL,
@@ -32,6 +32,7 @@ CREATE TABLE subscribers (
 CREATE TABLE subscriptions (
   id BLOB PRIMARY KEY NOT NULL,
   subscriber_id BLOB NOT NULL,
+  chunk_size NUMBER NOT NULL DEFAULT 1,
   book_id BLOB NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,

@@ -3,8 +3,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Not Found")]
-    ResourceNotFound(),
+    #[error("{0}")]
+    InvalidRequest(String),
+    #[error("Resource of type {resource_type} with id {id:?} not found.")]
+    ResourceNotFound { resource_type: String, id: String },
     #[error("Failed to serialize a value to json")]
     Serialization(#[from] serde_json::Error),
     #[error("A database error occurred")]
@@ -17,8 +19,12 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
-        match self {
-            Error::ResourceNotFound() => StatusCode::NOT_FOUND.into_response(),
+        println!("{:?}", self);
+        match &self {
+            Error::ResourceNotFound {
+                resource_type: _,
+                id: _,
+            } => (StatusCode::NOT_FOUND, self.to_string()).into_response(),
             _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
     }
