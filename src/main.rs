@@ -2,12 +2,15 @@ mod controllers;
 mod error;
 mod logging;
 mod models;
+mod providers;
+mod tasks;
 mod util;
 
 use controllers::{books, chapters, subscribers, subscriptions};
-use error::Result;
+use error::ApiResult;
 
 use axum::Router;
+use futures::Future;
 use logging::configure_tracing;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
@@ -15,15 +18,17 @@ use sqlx::{
 };
 use std::str::FromStr;
 use std::{fs, net::SocketAddr};
+use tokio::signal;
 use tower_http::trace::TraceLayer;
+use tracing::error;
 
 #[derive(Clone)]
 pub struct AppState {
     pool: Pool<Sqlite>,
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 8)]
-async fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> ApiResult<()> {
     configure_tracing();
 
     let _ = fs::remove_file("data.db");
@@ -34,6 +39,54 @@ async fn main() -> Result<()> {
 
     new_db(pool.clone()).await?;
 
+    let cancel = tokio::spawn(signal::ctrl_c());
+    tokio::pin!(cancel);
+    let mut server = Box::pin(tokio::spawn(get_server_future(pool.clone())));
+    let mut check_for_new_chapters = Box::pin(tokio::spawn(
+        tasks::chapter_discovery::check_for_new_chap_loop(pool.clone()),
+    ));
+    let mut chapter_body_fetcher = Box::pin(tokio::spawn(
+        tasks::chapter_body_hydration::check_for_bodiless_chap_loop(pool.clone()),
+    ));
+    loop {
+        tokio::select! {
+            x = &mut server => {
+                error!("API server thread failed. Restarting the thread.");
+                match x {
+                    Ok(_) => error!("API Server returned OK. This should not be possible."),
+                    Err(err) => error!(?err, "API Server has paniced. This should not be possible."),
+                };
+                server.set(tokio::spawn(get_server_future(pool.clone())));
+
+            },
+            x = &mut check_for_new_chapters => {
+                error!("New chapter check thread failed. Restarting the thread.");
+                match x {
+                    Ok(_) => error!("New chapter check returned OK. This should not be possible."),
+                    Err(err) => error!(?err, "New chapter check has paniced. This should not be possible."),
+                };
+                check_for_new_chapters.set(tokio::spawn(tasks::chapter_discovery::check_for_new_chap_loop(pool.clone())));
+
+            }
+            x = &mut chapter_body_fetcher => {
+                error!("Chapter Body fetch thread failed. Restarting the thread.");
+                match x {
+                    Ok(_) => error!("Chapter body fetch returned OK. This should not be possible."),
+                    Err(err) => error!(?err, "Chapter body fetch has paniced. This should not be possible."),
+                };
+                check_for_new_chapters.set(tokio::spawn(tasks::chapter_body_hydration::check_for_bodiless_chap_loop(pool.clone())));
+
+            }
+            _ = &mut cancel => {
+                println!("Received exit signal, exiting.");
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn get_server_future(pool: Pool<Sqlite>) -> impl Future<Output = Result<(), hyper::Error>> {
     let state = AppState { pool };
 
     let subscribers = subscribers::router();
@@ -50,13 +103,10 @@ async fn main() -> Result<()> {
         .with_state(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-        .await?;
-    Ok(())
+    axum::Server::bind(&addr).serve(app.into_make_service_with_connect_info::<SocketAddr>())
 }
 
-async fn new_db(pool: Pool<Sqlite>) -> Result<()> {
+async fn new_db(pool: Pool<Sqlite>) -> ApiResult<()> {
     sqlx::query(&String::from_utf8_lossy(include_bytes!(
         "../create_tables.sql"
     )))

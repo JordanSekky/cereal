@@ -4,7 +4,7 @@ use sqlx::{sqlite::SqliteRow, Pool, Row, Sqlite};
 use tracing::{info_span, instrument, Instrument};
 use uuid::Uuid;
 
-use crate::error::{Error, Result};
+use crate::error::{ApiError, ApiResult};
 
 use super::decode_uuid;
 
@@ -50,7 +50,7 @@ impl SubscriberClient {
         name: &str,
         pushover_key: Option<&str>,
         kindle_email: Option<&str>,
-    ) -> Result<Subscriber> {
+    ) -> ApiResult<Subscriber> {
         let subscriber = sqlx::query_as::<_, Subscriber>(
             "INSERT INTO subscribers(id, name, kindle_email, pushover_key, created_at, updated_at) 
             VALUES(?, ?, ?, ?, ?, ?) 
@@ -75,7 +75,7 @@ impl SubscriberClient {
         name: Option<&str>,
         kindle_email: Option<&str>,
         pushover_key: Option<&str>,
-    ) -> Result<Subscriber> {
+    ) -> ApiResult<Subscriber> {
         let subscriber = sqlx::query_as::<_, Subscriber>(
             "UPDATE subscribers
                  SET kindle_email = coalesce(?, kindle_email),
@@ -95,7 +95,7 @@ impl SubscriberClient {
         .await?;
         match subscriber {
             Some(x) => Ok(x),
-            None => Err(Error::ResourceNotFound {
+            None => Err(ApiError::ResourceNotFound {
                 id: id.to_string(),
                 resource_type: String::from("subscriber"),
             }),
@@ -103,7 +103,7 @@ impl SubscriberClient {
     }
 
     #[instrument(skip(self))]
-    pub async fn get_subscriber(&self, id: Uuid) -> Result<Option<Subscriber>> {
+    pub async fn get_subscriber(&self, id: Uuid) -> ApiResult<Option<Subscriber>> {
         let subscriber = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .fetch_optional(&self.pool)
@@ -113,7 +113,7 @@ impl SubscriberClient {
     }
 
     #[instrument(skip(self))]
-    pub async fn list_subscribers(&self) -> Result<Vec<Subscriber>> {
+    pub async fn list_subscribers(&self) -> ApiResult<Vec<Subscriber>> {
         let subscribers = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers")
             .fetch_all(&self.pool)
             .instrument(info_span!("Querying db"))
@@ -122,7 +122,7 @@ impl SubscriberClient {
     }
 
     #[instrument(skip(self))]
-    pub async fn delete_subscriber(&self, id: Uuid) -> Result<()> {
+    pub async fn delete_subscriber(&self, id: Uuid) -> ApiResult<()> {
         sqlx::query("DELETE FROM subscribers WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .execute(&self.pool)

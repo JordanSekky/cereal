@@ -10,7 +10,7 @@ use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
-    error::Error,
+    error::ApiError,
     models::{Subscription, SubscriptionClient},
     AppState,
 };
@@ -29,7 +29,7 @@ struct CreateSubscriptionRequest {
 async fn create_subscription_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateSubscriptionRequest>,
-) -> Result<Json<Subscription>, Error> {
+) -> Result<Json<Subscription>, ApiError> {
     let pool = state.pool;
     let client = SubscriptionClient::new(&pool);
     let subscription = client
@@ -62,9 +62,9 @@ struct UpdateSubscriptionResponse {
 async fn update_subscription_handler(
     State(state): State<AppState>,
     Json(request): Json<UpdateSubscriptionRequest>,
-) -> Result<Json<UpdateSubscriptionResponse>, Error> {
+) -> Result<Json<UpdateSubscriptionResponse>, ApiError> {
     if request.chunk_size.is_none() {
-        return Err(Error::InvalidRequest(String::from(
+        return Err(ApiError::InvalidRequest(String::from(
             "Expected one of [chunk_size] to be set but none were.",
         )));
     }
@@ -90,13 +90,13 @@ struct GetSubscriptionRequest {
 async fn get_subscription_handler(
     State(state): State<AppState>,
     Query(request): Query<GetSubscriptionRequest>,
-) -> Result<Json<Subscription>, Error> {
+) -> Result<Json<Subscription>, ApiError> {
     let pool = state.pool;
     let client = SubscriptionClient::new(&pool);
     let subscriber = client.get_subscription(request.id).await?;
     match subscriber {
         Some(x) => Ok(x.into()),
-        None => Err(Error::ResourceNotFound {
+        None => Err(ApiError::ResourceNotFound {
             resource_type: String::from("subscription"),
             id: request.id.to_string(),
         }),
@@ -117,7 +117,7 @@ struct ListSubscriptionsResult {
 async fn list_subscriptions_handler(
     State(state): State<AppState>,
     Query(request): Query<ListSubscriptionsRequest>,
-) -> Result<Json<ListSubscriptionsResult>, Error> {
+) -> Result<Json<ListSubscriptionsResult>, ApiError> {
     let pool = state.pool;
     let client = SubscriptionClient::new(&pool);
     let subscriptions = client.list_subscriptions(&request.subscriber_id).await?;
@@ -133,7 +133,7 @@ struct DeleteSubscriptionRequest {
 async fn delete_subscription_handler(
     State(state): State<AppState>,
     Json(request): Json<DeleteSubscriptionRequest>,
-) -> Result<Json<serde_json::Value>, Error> {
+) -> Result<Json<serde_json::Value>, ApiError> {
     let pool = state.pool;
     let client = SubscriptionClient::new(&pool);
     client.delete_subscription(request.id).await?;

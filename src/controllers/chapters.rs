@@ -3,20 +3,21 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
-    error::Error,
+    error::ApiError,
     models::{Chapter, ChapterClient, ChapterMetadata},
     AppState,
 };
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 struct CreateChapterRequest {
+    #[serde(rename = "bookId")]
     book_id: Uuid,
     title: String,
     metadata: ChapterMetadata,
@@ -26,7 +27,7 @@ struct CreateChapterRequest {
 async fn create_chapter_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateChapterRequest>,
-) -> Result<Json<Chapter>, Error> {
+) -> Result<Json<Chapter>, ApiError> {
     let pool = state.pool;
     let client = ChapterClient::new(&pool);
     let chapter = client
@@ -34,6 +35,7 @@ async fn create_chapter_handler(
             &request.book_id,
             &request.title,
             &request.metadata,
+            None,
             None,
             None,
         )
@@ -45,6 +47,8 @@ async fn create_chapter_handler(
 struct UpdateChapterRequest {
     id: Uuid,
     title: Option<String>,
+    #[serde(rename = "publishedAt")]
+    published_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -52,6 +56,7 @@ struct UpdateChapterResponse {
     id: Uuid,
     #[serde(skip_serializing_if = "Option::is_none")]
     title: Option<String>,
+    #[serde(rename = "updatedAt")]
     updated_at: chrono::DateTime<Utc>,
 }
 
@@ -59,11 +64,17 @@ struct UpdateChapterResponse {
 async fn update_chapter_handler(
     State(state): State<AppState>,
     Json(request): Json<UpdateChapterRequest>,
-) -> Result<Json<UpdateChapterResponse>, Error> {
+) -> Result<Json<UpdateChapterResponse>, ApiError> {
     let pool = state.pool;
     let client = ChapterClient::new(&pool);
     let chapter = client
-        .update_chapter(&request.id, request.title.as_deref(), None, None)
+        .update_chapter(
+            &request.id,
+            request.title.as_deref(),
+            None,
+            None,
+            request.published_at.as_ref(),
+        )
         .await?;
     Ok(UpdateChapterResponse {
         id: chapter.id,
@@ -82,13 +93,13 @@ struct GetChapterRequest {
 async fn get_chapter_handler(
     State(state): State<AppState>,
     Query(request): Query<GetChapterRequest>,
-) -> Result<Json<Chapter>, Error> {
+) -> Result<Json<Chapter>, ApiError> {
     let pool = state.pool;
     let client = ChapterClient::new(&pool);
     let chapter = client.get_chapter(request.id).await?;
     match chapter {
         Some(x) => Ok(x.into()),
-        None => Err(Error::ResourceNotFound {
+        None => Err(ApiError::ResourceNotFound {
             resource_type: String::from("chapter"),
             id: request.id.to_string(),
         }),
@@ -97,23 +108,24 @@ async fn get_chapter_handler(
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 struct ListChaptersRequest {
+    #[serde(rename = "bookId")]
     book_id: Uuid,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 struct ListChaptersResult {
-    books: Vec<Chapter>,
+    chapters: Vec<Chapter>,
 }
 
 #[instrument(skip(state))]
 async fn list_chapters_handler(
     State(state): State<AppState>,
     Query(request): Query<ListChaptersRequest>,
-) -> Result<Json<ListChaptersResult>, Error> {
+) -> Result<Json<ListChaptersResult>, ApiError> {
     let pool = state.pool;
     let client = ChapterClient::new(&pool);
     let chapters = client.list_chapters(&request.book_id).await?;
-    Ok(ListChaptersResult { books: chapters }.into())
+    Ok(ListChaptersResult { chapters }.into())
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
@@ -125,10 +137,10 @@ struct DeleteChapterRequest {
 async fn delete_chapter_handler(
     State(state): State<AppState>,
     Json(request): Json<DeleteChapterRequest>,
-) -> Result<Json<serde_json::Value>, Error> {
+) -> Result<Json<serde_json::Value>, ApiError> {
     let pool = state.pool;
     let client = ChapterClient::new(&pool);
-    client.delete_chapter(request.id).await?;
+    client.delete_chapter(&request.id).await?;
     Ok(json!({}).into())
 }
 

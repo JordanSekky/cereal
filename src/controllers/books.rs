@@ -10,7 +10,7 @@ use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
-    error::Error,
+    error::ApiError,
     models::{Book, BookClient, BookMetadata},
     AppState,
 };
@@ -26,7 +26,7 @@ struct CreateBookRequest {
 async fn create_book_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateBookRequest>,
-) -> Result<Json<Book>, Error> {
+) -> Result<Json<Book>, ApiError> {
     let pool = state.pool;
     let client = BookClient::new(&pool);
     let book = client
@@ -56,7 +56,7 @@ struct UpdateBookResponse {
 async fn update_book_handler(
     State(state): State<AppState>,
     Json(request): Json<UpdateBookRequest>,
-) -> Result<Json<UpdateBookResponse>, Error> {
+) -> Result<Json<UpdateBookResponse>, ApiError> {
     let pool = state.pool;
     let client = BookClient::new(&pool);
     let book = client
@@ -84,13 +84,13 @@ struct GetBookRequest {
 async fn get_book_handler(
     State(state): State<AppState>,
     Query(request): Query<GetBookRequest>,
-) -> Result<Json<Book>, Error> {
+) -> Result<Json<Book>, ApiError> {
     let pool = state.pool;
     let client = BookClient::new(&pool);
-    let book = client.get_book(request.id).await?;
+    let book = client.get_book(&request.id).await?;
     match book {
         Some(x) => Ok(x.into()),
-        None => Err(Error::ResourceNotFound {
+        None => Err(ApiError::ResourceNotFound {
             resource_type: String::from("book"),
             id: request.id.to_string(),
         }),
@@ -102,7 +102,9 @@ struct ListBooksResult {
     books: Vec<Book>,
 }
 
-async fn list_books_handler(State(state): State<AppState>) -> Result<Json<ListBooksResult>, Error> {
+async fn list_books_handler(
+    State(state): State<AppState>,
+) -> Result<Json<ListBooksResult>, ApiError> {
     let pool = state.pool;
     let client = BookClient::new(&pool);
     let books = client.list_books().await?;
@@ -118,10 +120,10 @@ struct DeleteBookRequest {
 async fn delete_book_handler(
     State(state): State<AppState>,
     Json(request): Json<DeleteBookRequest>,
-) -> Result<Json<serde_json::Value>, Error> {
+) -> Result<Json<serde_json::Value>, ApiError> {
     let pool = state.pool;
     let client = BookClient::new(&pool);
-    client.delete_book(request.id).await?;
+    client.delete_book(&request.id).await?;
     Ok(json!({}).into())
 }
 

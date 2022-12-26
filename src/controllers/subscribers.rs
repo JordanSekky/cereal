@@ -10,7 +10,7 @@ use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
-    error::Error,
+    error::ApiError,
     models::{Subscriber, SubscriberClient},
     AppState,
 };
@@ -26,7 +26,7 @@ struct CreateSubscriberRequest {
 async fn create_subscriber_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateSubscriberRequest>,
-) -> Result<Json<Subscriber>, Error> {
+) -> Result<Json<Subscriber>, ApiError> {
     let pool = state.pool;
     let client = SubscriberClient::new(&pool);
     let subscriber = client
@@ -65,7 +65,7 @@ struct UpdateSubscriberResponse {
 async fn update_subscriber_handler(
     State(state): State<AppState>,
     Json(request): Json<UpdateSubscriberRequest>,
-) -> Result<Json<UpdateSubscriberResponse>, Error> {
+) -> Result<Json<UpdateSubscriberResponse>, ApiError> {
     let pool = state.pool;
     let client = SubscriberClient::new(&pool);
     let subscriber = client
@@ -95,13 +95,13 @@ struct GetSubscriberRequest {
 async fn get_subscriber_handler(
     State(state): State<AppState>,
     Query(request): Query<GetSubscriberRequest>,
-) -> Result<Json<Subscriber>, Error> {
+) -> Result<Json<Subscriber>, ApiError> {
     let pool = state.pool;
     let client = SubscriberClient::new(&pool);
     let subscriber = client.get_subscriber(request.id).await?;
     match subscriber {
         Some(x) => Ok(x.into()),
-        None => Err(Error::ResourceNotFound {
+        None => Err(ApiError::ResourceNotFound {
             resource_type: String::from("subscriber"),
             id: request.id.to_string(),
         }),
@@ -116,7 +116,7 @@ struct ListSubscribersResult {
 #[instrument(skip(state))]
 async fn list_subscribers_handler(
     State(state): State<AppState>,
-) -> Result<Json<ListSubscribersResult>, Error> {
+) -> Result<Json<ListSubscribersResult>, ApiError> {
     let pool = state.pool;
     let client = SubscriberClient::new(&pool);
     let subscribers = client.list_subscribers().await?;
@@ -132,7 +132,7 @@ struct DeleteSubscriberRequest {
 async fn delete_subscriber_handler(
     State(state): State<AppState>,
     Json(request): Json<DeleteSubscriberRequest>,
-) -> Result<Json<serde_json::Value>, Error> {
+) -> Result<Json<serde_json::Value>, ApiError> {
     let pool = state.pool;
     let client = SubscriberClient::new(&pool);
     client.delete_subscriber(request.id).await?;

@@ -4,7 +4,7 @@ use sqlx::{sqlite::SqliteRow, Pool, Row, Sqlite};
 use tracing::{info_span, instrument, Instrument};
 use uuid::Uuid;
 
-use crate::error::{Error, Result};
+use crate::error::{ApiError, ApiResult};
 
 use super::decode_uuid;
 
@@ -16,7 +16,6 @@ pub struct BookClient {
 pub enum BookMetadata {
     RoyalRoad(u64),
     Pale,
-    APracticalGuideToEvil,
     TheWanderingInn,
     TheWanderingInnPatreon,
     TheDailyGrindPatreon,
@@ -39,7 +38,7 @@ impl TryFrom<(&SqliteRow, &str)> for BookMetadata {
 }
 
 impl BookMetadata {
-    pub fn json(&self) -> Result<String> {
+    pub fn json(&self) -> ApiResult<String> {
         let json = serde_json::to_string(self)?;
         Ok(json)
     }
@@ -81,7 +80,7 @@ impl BookClient {
         title: &str,
         author: &str,
         metadata: &BookMetadata,
-    ) -> Result<Book> {
+    ) -> ApiResult<Book> {
         let book = sqlx::query_as::<_, Book>(
             "INSERT INTO books(id, title, author, metadata, created_at, updated_at) 
             VALUES(?, ?, ?, ?, ?, ?) 
@@ -105,7 +104,7 @@ impl BookClient {
         id: &Uuid,
         title: Option<&str>,
         author: Option<&str>,
-    ) -> Result<Book> {
+    ) -> ApiResult<Book> {
         let book = sqlx::query_as::<_, Book>(
             "UPDATE books
                  SET title = coalesce(?, title),
@@ -123,7 +122,7 @@ impl BookClient {
         .await?;
         match book {
             Some(x) => Ok(x),
-            None => Err(Error::ResourceNotFound {
+            None => Err(ApiError::ResourceNotFound {
                 id: id.to_string(),
                 resource_type: String::from("book"),
             }),
@@ -131,7 +130,7 @@ impl BookClient {
     }
 
     #[instrument(skip(self))]
-    pub async fn get_book(&self, id: Uuid) -> Result<Option<Book>> {
+    pub async fn get_book(&self, id: &Uuid) -> ApiResult<Option<Book>> {
         let book = sqlx::query_as::<_, Book>("SELECT * FROM books WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .fetch_optional(&self.pool)
@@ -141,7 +140,7 @@ impl BookClient {
     }
 
     #[instrument(skip(self))]
-    pub async fn list_books(&self) -> Result<Vec<Book>> {
+    pub async fn list_books(&self) -> ApiResult<Vec<Book>> {
         let books = sqlx::query_as::<_, Book>("SELECT * FROM books")
             .fetch_all(&self.pool)
             .instrument(info_span!("Querying db"))
@@ -150,7 +149,7 @@ impl BookClient {
     }
 
     #[instrument(skip(self))]
-    pub async fn delete_book(&self, id: Uuid) -> Result<()> {
+    pub async fn delete_book(&self, id: &Uuid) -> ApiResult<()> {
         sqlx::query("DELETE FROM books WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .execute(&self.pool)

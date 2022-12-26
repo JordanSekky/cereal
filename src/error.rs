@@ -2,7 +2,7 @@ use axum::{http::StatusCode, response::IntoResponse};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum ApiError {
     #[error("{0}")]
     InvalidRequest(String),
     #[error("Resource of type {resource_type} with id {id:?} not found.")]
@@ -15,13 +15,13 @@ pub enum Error {
     TowerServer(#[from] hyper::Error),
 }
 
-pub type Result<T> = core::result::Result<T, Error>;
+pub type ApiResult<T> = Result<T, ApiError>;
 
-impl IntoResponse for Error {
+impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
         println!("{:?}", self);
         match &self {
-            Error::ResourceNotFound {
+            ApiError::ResourceNotFound {
                 resource_type: _,
                 id: _,
             } => (StatusCode::NOT_FOUND, self.to_string()).into_response(),
