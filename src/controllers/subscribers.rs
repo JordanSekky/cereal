@@ -6,6 +6,7 @@ use axum::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
@@ -21,6 +22,7 @@ struct CreateSubscriberRequest {
     pushover_key: Option<String>,
 }
 
+#[instrument(skip(state))]
 async fn create_subscriber_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateSubscriberRequest>,
@@ -59,6 +61,7 @@ struct UpdateSubscriberResponse {
     updated_at: chrono::DateTime<Utc>,
 }
 
+#[instrument(skip(state))]
 async fn update_subscriber_handler(
     State(state): State<AppState>,
     Json(request): Json<UpdateSubscriberRequest>,
@@ -88,6 +91,7 @@ struct GetSubscriberRequest {
     id: Uuid,
 }
 
+#[instrument(skip(state))]
 async fn get_subscriber_handler(
     State(state): State<AppState>,
     Query(request): Query<GetSubscriberRequest>,
@@ -109,6 +113,7 @@ struct ListSubscribersResult {
     subscribers: Vec<Subscriber>,
 }
 
+#[instrument(skip(state))]
 async fn list_subscribers_handler(
     State(state): State<AppState>,
 ) -> Result<Json<ListSubscribersResult>, Error> {
@@ -123,6 +128,7 @@ struct DeleteSubscriberRequest {
     id: Uuid,
 }
 
+#[instrument(skip(state))]
 async fn delete_subscriber_handler(
     State(state): State<AppState>,
     Json(request): Json<DeleteSubscriberRequest>,

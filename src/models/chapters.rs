@@ -1,6 +1,7 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqliteRow, Pool, Row, Sqlite};
+use tracing::{info_span, instrument, Instrument};
 use uuid::Uuid;
 
 use crate::{
@@ -93,6 +94,7 @@ impl ChapterClient {
         ChapterClient { pool: pool.clone() }
     }
 
+    #[instrument(skip(self))]
     pub async fn create_chapter(
         &self,
         book_id: &Uuid,
@@ -115,6 +117,7 @@ impl ChapterClient {
         .bind(Utc::now())
         .bind(Utc::now())
         .fetch_one(&self.pool)
+        .instrument(info_span!("Querying db"))
         .await;
         match chapter {
             Ok(chapter) => Ok(chapter),
@@ -128,6 +131,7 @@ impl ChapterClient {
         }
     }
 
+    #[instrument(skip(self))]
     pub async fn update_chapter(
         &self,
         id: &Uuid,
@@ -150,6 +154,7 @@ impl ChapterClient {
         .bind(Utc::now())
         .bind(id.as_bytes().as_slice())
         .fetch_optional(&self.pool)
+        .instrument(info_span!("Querying db"))
         .await?;
         match chapter {
             Some(x) => Ok(x),
@@ -160,26 +165,32 @@ impl ChapterClient {
         }
     }
 
+    #[instrument(skip(self))]
     pub async fn get_chapter(&self, id: Uuid) -> Result<Option<Chapter>> {
         let book = sqlx::query_as::<_, Chapter>("SELECT * FROM chapters WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .fetch_optional(&self.pool)
+            .instrument(info_span!("Querying db"))
             .await?;
         Ok(book)
     }
 
+    #[instrument(skip(self))]
     pub async fn list_chapters(&self, book_id: &Uuid) -> Result<Vec<Chapter>> {
         let chapters = sqlx::query_as::<_, Chapter>("SELECT * FROM chapters where book_id = ?")
             .bind(book_id.as_bytes().as_slice())
             .fetch_all(&self.pool)
+            .instrument(info_span!("Querying db"))
             .await?;
         Ok(chapters)
     }
 
+    #[instrument(skip(self))]
     pub async fn delete_chapter(&self, id: Uuid) -> Result<()> {
         sqlx::query("DELETE FROM chapters WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .execute(&self.pool)
+            .instrument(info_span!("Querying db"))
             .await?;
         Ok(())
     }

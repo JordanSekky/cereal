@@ -1,6 +1,7 @@
 use chrono::Utc;
 use serde::Serialize;
 use sqlx::{sqlite::SqliteRow, Pool, Row, Sqlite};
+use tracing::{info_span, instrument, Instrument};
 use uuid::Uuid;
 
 use crate::error::{Error, Result};
@@ -43,6 +44,7 @@ impl SubscriberClient {
         SubscriberClient { pool: pool.clone() }
     }
 
+    #[instrument(skip(self))]
     pub async fn create_subscriber(
         &self,
         name: &str,
@@ -61,10 +63,12 @@ impl SubscriberClient {
         .bind(Utc::now())
         .bind(Utc::now())
         .fetch_one(&self.pool)
+        .instrument(info_span!("Querying db"))
         .await?;
         Ok(subscriber)
     }
 
+    #[instrument(skip(self))]
     pub async fn update_subscriber(
         &self,
         id: &Uuid,
@@ -87,6 +91,7 @@ impl SubscriberClient {
         .bind(Utc::now())
         .bind(id.as_bytes().as_slice())
         .fetch_optional(&self.pool)
+        .instrument(info_span!("Querying db"))
         .await?;
         match subscriber {
             Some(x) => Ok(x),
@@ -97,25 +102,31 @@ impl SubscriberClient {
         }
     }
 
+    #[instrument(skip(self))]
     pub async fn get_subscriber(&self, id: Uuid) -> Result<Option<Subscriber>> {
         let subscriber = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .fetch_optional(&self.pool)
+            .instrument(info_span!("Querying db"))
             .await?;
         Ok(subscriber)
     }
 
+    #[instrument(skip(self))]
     pub async fn list_subscribers(&self) -> Result<Vec<Subscriber>> {
         let subscribers = sqlx::query_as::<_, Subscriber>("SELECT * FROM subscribers")
             .fetch_all(&self.pool)
+            .instrument(info_span!("Querying db"))
             .await?;
         Ok(subscribers)
     }
 
+    #[instrument(skip(self))]
     pub async fn delete_subscriber(&self, id: Uuid) -> Result<()> {
         sqlx::query("DELETE FROM subscribers WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .execute(&self.pool)
+            .instrument(info_span!("Querying db"))
             .await?;
         Ok(())
     }

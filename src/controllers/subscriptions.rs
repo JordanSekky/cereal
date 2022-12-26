@@ -6,6 +6,7 @@ use axum::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
@@ -24,6 +25,7 @@ struct CreateSubscriptionRequest {
     chunk_size: Option<i32>,
 }
 
+#[instrument(skip(state))]
 async fn create_subscription_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateSubscriptionRequest>,
@@ -56,6 +58,7 @@ struct UpdateSubscriptionResponse {
     updated_at: chrono::DateTime<Utc>,
 }
 
+#[instrument(skip(state))]
 async fn update_subscription_handler(
     State(state): State<AppState>,
     Json(request): Json<UpdateSubscriptionRequest>,
@@ -83,6 +86,7 @@ struct GetSubscriptionRequest {
     id: Uuid,
 }
 
+#[instrument(skip(state))]
 async fn get_subscription_handler(
     State(state): State<AppState>,
     Query(request): Query<GetSubscriptionRequest>,
@@ -109,6 +113,7 @@ struct ListSubscriptionsResult {
     subscriptions: Vec<Subscription>,
 }
 
+#[instrument(skip(state))]
 async fn list_subscriptions_handler(
     State(state): State<AppState>,
     Query(request): Query<ListSubscriptionsRequest>,
@@ -124,6 +129,7 @@ struct DeleteSubscriptionRequest {
     id: Uuid,
 }
 
+#[instrument(skip(state))]
 async fn delete_subscription_handler(
     State(state): State<AppState>,
     Json(request): Json<DeleteSubscriptionRequest>,

@@ -6,6 +6,7 @@ use axum::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
@@ -21,6 +22,7 @@ struct CreateBookRequest {
     metadata: BookMetadata,
 }
 
+#[instrument(skip(state))]
 async fn create_book_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateBookRequest>,
@@ -50,6 +52,7 @@ struct UpdateBookResponse {
     updated_at: chrono::DateTime<Utc>,
 }
 
+#[instrument(skip(state))]
 async fn update_book_handler(
     State(state): State<AppState>,
     Json(request): Json<UpdateBookRequest>,
@@ -77,6 +80,7 @@ struct GetBookRequest {
     id: Uuid,
 }
 
+#[instrument(skip(state))]
 async fn get_book_handler(
     State(state): State<AppState>,
     Query(request): Query<GetBookRequest>,
@@ -110,6 +114,7 @@ struct DeleteBookRequest {
     id: Uuid,
 }
 
+#[instrument(skip(state))]
 async fn delete_book_handler(
     State(state): State<AppState>,
     Json(request): Json<DeleteBookRequest>,

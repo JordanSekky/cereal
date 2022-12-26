@@ -1,6 +1,7 @@
 use chrono::Utc;
 use serde::Serialize;
 use sqlx::{sqlite::SqliteRow, Pool, Row, Sqlite};
+use tracing::{info_span, instrument, Instrument};
 use uuid::Uuid;
 
 use crate::error::{Error, Result};
@@ -44,6 +45,7 @@ impl SubscriptionClient {
         SubscriptionClient { pool: pool.clone() }
     }
 
+    #[instrument(skip(self))]
     pub async fn create_subscription(
         &self,
         subscriber_id: &Uuid,
@@ -53,7 +55,12 @@ impl SubscriptionClient {
         // Sqlite doesn't tell us _which_ foreign key causes an error, so we must do some checks
         let book_client = BookClient::new(&self.pool);
         let subscriber_client = SubscriberClient::new(&self.pool);
-        if book_client.get_book(*book_id).await?.is_none() {
+        if book_client
+            .get_book(*book_id)
+            .instrument(info_span!("Querying db"))
+            .await?
+            .is_none()
+        {
             return Err(Error::ResourceNotFound {
                 resource_type: String::from("book"),
                 id: book_id.to_string(),
@@ -62,6 +69,7 @@ impl SubscriptionClient {
 
         if subscriber_client
             .get_subscriber(*subscriber_id)
+            .instrument(info_span!("Querying db"))
             .await?
             .is_none()
         {
@@ -83,10 +91,12 @@ impl SubscriptionClient {
         .bind(Utc::now())
         .bind(Utc::now())
         .fetch_one(&self.pool)
+            .instrument(info_span!("Querying db"))
         .await?;
         Ok(subscription)
     }
 
+    #[instrument(skip(self))]
     pub async fn update_subscription(
         &self,
         id: &Uuid,
@@ -103,6 +113,7 @@ impl SubscriptionClient {
         .bind(Utc::now())
         .bind(id.as_bytes().as_slice())
         .fetch_optional(&self.pool)
+        .instrument(info_span!("Querying db"))
         .await?;
         match subscription {
             Some(x) => Ok(x),
@@ -113,15 +124,18 @@ impl SubscriptionClient {
         }
     }
 
+    #[instrument(skip(self))]
     pub async fn get_subscription(&self, id: Uuid) -> Result<Option<Subscription>> {
         let subscription =
             sqlx::query_as::<_, Subscription>("SELECT * FROM subscriptions WHERE id = ?")
                 .bind(id.as_bytes().as_slice())
                 .fetch_optional(&self.pool)
+                .instrument(info_span!("Querying db"))
                 .await?;
         Ok(subscription)
     }
 
+    #[instrument(skip(self))]
     pub async fn list_subscriptions(&self, subscriber_id: &Uuid) -> Result<Vec<Subscription>> {
         let subscriptions = sqlx::query_as::<_, Subscription>(
             "
@@ -130,14 +144,17 @@ impl SubscriptionClient {
         )
         .bind(subscriber_id.as_bytes().as_slice())
         .fetch_all(&self.pool)
+        .instrument(info_span!("Querying db"))
         .await?;
         Ok(subscriptions)
     }
 
+    #[instrument(skip(self))]
     pub async fn delete_subscription(&self, id: Uuid) -> Result<()> {
         sqlx::query("DELETE FROM subscriptions WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .execute(&self.pool)
+            .instrument(info_span!("Querying db"))
             .await?;
         Ok(())
     }

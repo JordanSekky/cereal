@@ -6,6 +6,7 @@ use axum::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
@@ -21,6 +22,7 @@ struct CreateChapterRequest {
     metadata: ChapterMetadata,
 }
 
+#[instrument(skip(state))]
 async fn create_chapter_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateChapterRequest>,
@@ -53,6 +55,7 @@ struct UpdateChapterResponse {
     updated_at: chrono::DateTime<Utc>,
 }
 
+#[instrument(skip(state))]
 async fn update_chapter_handler(
     State(state): State<AppState>,
     Json(request): Json<UpdateChapterRequest>,
@@ -75,6 +78,7 @@ struct GetChapterRequest {
     id: Uuid,
 }
 
+#[instrument(skip(state))]
 async fn get_chapter_handler(
     State(state): State<AppState>,
     Query(request): Query<GetChapterRequest>,
@@ -101,6 +105,7 @@ struct ListChaptersResult {
     books: Vec<Chapter>,
 }
 
+#[instrument(skip(state))]
 async fn list_chapters_handler(
     State(state): State<AppState>,
     Query(request): Query<ListChaptersRequest>,
@@ -116,6 +121,7 @@ struct DeleteChapterRequest {
     id: Uuid,
 }
 
+#[instrument(skip(state))]
 async fn delete_chapter_handler(
     State(state): State<AppState>,
     Json(request): Json<DeleteChapterRequest>,

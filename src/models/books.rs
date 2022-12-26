@@ -1,6 +1,7 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqliteRow, Pool, Row, Sqlite};
+use tracing::{info_span, instrument, Instrument};
 use uuid::Uuid;
 
 use crate::error::{Error, Result};
@@ -74,6 +75,7 @@ impl BookClient {
         BookClient { pool: pool.clone() }
     }
 
+    #[instrument(skip(self))]
     pub async fn create_book(
         &self,
         title: &str,
@@ -92,10 +94,12 @@ impl BookClient {
         .bind(Utc::now())
         .bind(Utc::now())
         .fetch_one(&self.pool)
+        .instrument(info_span!("Querying db"))
         .await?;
         Ok(book)
     }
 
+    #[instrument(skip(self))]
     pub async fn update_book(
         &self,
         id: &Uuid,
@@ -115,6 +119,7 @@ impl BookClient {
         .bind(Utc::now())
         .bind(id.as_bytes().as_slice())
         .fetch_optional(&self.pool)
+        .instrument(info_span!("Querying db"))
         .await?;
         match book {
             Some(x) => Ok(x),
@@ -125,25 +130,31 @@ impl BookClient {
         }
     }
 
+    #[instrument(skip(self))]
     pub async fn get_book(&self, id: Uuid) -> Result<Option<Book>> {
         let book = sqlx::query_as::<_, Book>("SELECT * FROM books WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .fetch_optional(&self.pool)
+            .instrument(info_span!("Querying db"))
             .await?;
         Ok(book)
     }
 
+    #[instrument(skip(self))]
     pub async fn list_books(&self) -> Result<Vec<Book>> {
         let books = sqlx::query_as::<_, Book>("SELECT * FROM books")
             .fetch_all(&self.pool)
+            .instrument(info_span!("Querying db"))
             .await?;
         Ok(books)
     }
 
+    #[instrument(skip(self))]
     pub async fn delete_book(&self, id: Uuid) -> Result<()> {
         sqlx::query("DELETE FROM books WHERE id = ?")
             .bind(id.as_bytes().as_slice())
             .execute(&self.pool)
+            .instrument(info_span!("Querying db"))
             .await?;
         Ok(())
     }
