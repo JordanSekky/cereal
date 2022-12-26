@@ -1,6 +1,13 @@
 use std::env;
 
-use opentelemetry::{runtime::Tokio, sdk::trace::Tracer};
+use opentelemetry::{
+    runtime::Tokio,
+    sdk::{
+        trace::{self, Tracer},
+        Resource,
+    },
+    KeyValue,
+};
 use opentelemetry_otlp::WithExportConfig;
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, Registry};
@@ -23,6 +30,12 @@ fn get_honeycomb_tracer() -> Tracer {
     opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_exporter(otlp_exporter)
+        .with_trace_config(
+            trace::config().with_resource(Resource::new(vec![KeyValue::new(
+                opentelemetry_semantic_conventions::resource::SERVICE_NAME,
+                "cereal_rewrite".to_string(),
+            )])),
+        )
         .install_batch(Tokio)
         .unwrap()
 }
