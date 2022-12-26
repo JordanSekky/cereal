@@ -4,7 +4,6 @@ use axum::{
     Json, Router,
 };
 use chrono::Utc;
-use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -134,7 +133,7 @@ async fn delete_subscriber_handler(
     Ok(json!({}).into())
 }
 
-pub fn router() -> Router<AppState, Body> {
+pub fn router() -> Router<AppState> {
     Router::new()
         .route("/createSubscriber", post(create_subscriber_handler))
         .route("/updateSubscriber", post(update_subscriber_handler))

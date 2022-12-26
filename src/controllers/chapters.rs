@@ -4,7 +4,6 @@ use axum::{
     Json, Router,
 };
 use chrono::Utc;
-use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -127,7 +126,7 @@ async fn delete_chapter_handler(
     Ok(json!({}).into())
 }
 
-pub fn router() -> Router<AppState, Body> {
+pub fn router() -> Router<AppState> {
     Router::new()
         .route("/createChapter", post(create_chapter_handler))
         .route("/updateChapter", post(update_chapter_handler))

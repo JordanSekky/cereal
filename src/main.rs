@@ -1,17 +1,18 @@
-use axum::Router;
-use error::Result;
-mod models;
-use std::str::FromStr;
-use std::{fs, net::SocketAddr};
 mod controllers;
-use controllers::{books, chapters, subscribers, subscriptions};
 mod error;
+mod models;
 mod util;
 
+use controllers::{books, chapters, subscribers, subscriptions};
+use error::Result;
+
+use axum::Router;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
     Pool, Sqlite,
 };
+use std::str::FromStr;
+use std::{fs, net::SocketAddr};
 
 #[derive(Clone)]
 pub struct AppState {
