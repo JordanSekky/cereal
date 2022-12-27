@@ -19,7 +19,9 @@ use crate::{
 #[serde(deny_unknown_fields)]
 struct CreateSubscriberRequest {
     name: String,
+    #[serde(rename = "kindleEmail")]
     kindle_email: Option<String>,
+    #[serde(rename = "pushoverKey")]
     pushover_key: Option<String>,
 }
 
@@ -45,7 +47,9 @@ async fn create_subscriber_handler(
 struct UpdateSubscriberRequest {
     id: Uuid,
     name: Option<String>,
+    #[serde(rename = "kindleEmail")]
     kindle_email: Option<String>,
+    #[serde(rename = "pushoverKey")]
     pushover_key: Option<String>,
 }
 
