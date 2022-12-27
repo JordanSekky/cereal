@@ -1,5 +1,7 @@
 mod apparatus_of_change_patreon;
 mod daily_grind_patreon;
+mod pale;
+mod royalroad;
 mod wandering_inn_patreon;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -11,6 +13,8 @@ use crate::models::{BookMetadata, Chapter, ChapterMetadata, NewChapter};
 use self::{
     apparatus_of_change_patreon::ApparatusOfChangePatreonNewChapterProvider,
     daily_grind_patreon::DailyGrindPatreonNewChapterProvider,
+    pale::{PaleChapterBodyProvider, PaleNewChapterProvider},
+    royalroad::{RoyalroadChapterBodyProvider, RoyalroadNewChapterProvider},
     wandering_inn_patreon::WanderingInnPatreonChapterBodyProvider,
 };
 
@@ -36,9 +40,10 @@ impl BookMetadata {
             BookMetadata::ApparatusOfChangePatreon => {
                 Box::new(ApparatusOfChangePatreonNewChapterProvider)
             }
-            BookMetadata::RoyalRoad(_) => todo!(),
-            BookMetadata::Pale => todo!(),
-            BookMetadata::TheWanderingInn => todo!(),
+            BookMetadata::RoyalRoad { book_id } => Box::new(RoyalroadNewChapterProvider {
+                royalroad_book_id: *book_id,
+            }),
+            BookMetadata::Pale => Box::new(PaleNewChapterProvider),
         }
     }
 }
@@ -52,11 +57,17 @@ impl ChapterMetadata {
                     password: password.clone(),
                 }))
             }
+            ChapterMetadata::RoyalRoad {
+                royalroad_book_id: _,
+                royalroad_chapter_id,
+            } => Some(Box::new(RoyalroadChapterBodyProvider {
+                royalroad_chapter_id: *royalroad_chapter_id,
+            })),
+            ChapterMetadata::Pale { url } => {
+                Some(Box::new(PaleChapterBodyProvider { url: url.clone() }))
+            }
             ChapterMetadata::TheDailyGrindPatreon => None,
             ChapterMetadata::ApparatusOfChangePatreon => None,
-            ChapterMetadata::RoyalRoad { id: _ } => todo!(),
-            ChapterMetadata::Pale { url: _ } => todo!(),
-            ChapterMetadata::TheWanderingInn { url: _ } => todo!(),
         }
     }
 }

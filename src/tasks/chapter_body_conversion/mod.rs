@@ -40,8 +40,9 @@ pub async fn generate_chapter_epub(chapter: Chapter, pool: &Pool<Sqlite>) {
 
     let book_id = chapter.book_id;
     let chapter_id = chapter.id;
-    let chapter_body = match chapter.html {
-        Some(body) => body,
+    let mut chapter_body = format!("<h1>{}</h1>", chapter.title).into_bytes();
+    match chapter.html {
+        Some(mut body) => chapter_body.append(&mut body),
         None => {
             error!("Chapter id {} had no html body", &chapter_id);
             return;
@@ -134,7 +135,7 @@ pub async fn generate_multichapter_epub(
     let html_body: Vec<u8> = chapters
         .iter()
         .flat_map(|x| {
-            let mut bytes = format!("<h1>{}</h1>", x.title).as_bytes().to_vec();
+            let mut bytes = format!("<h1>{}</h1>", x.title).into_bytes();
             bytes.append(&mut x.html.clone().unwrap());
             bytes
         })

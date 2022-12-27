@@ -16,11 +16,11 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
     Pool, Sqlite,
 };
-use std::str::FromStr;
 use std::{fs, net::SocketAddr};
+use std::{path::Path, str::FromStr};
 use tokio::signal;
 use tower_http::trace::TraceLayer;
-use tracing::error;
+use tracing::{error, info, warn};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -31,13 +31,16 @@ pub struct AppState {
 async fn main() -> ApiResult<()> {
     configure_tracing();
 
-    let _ = fs::remove_file("data.db");
+    let create_db = !Path::new("./data.db").try_exists()?;
+
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
         .connect_with(SqliteConnectOptions::from_str("sqlite:data.db")?.create_if_missing(true))
         .await?;
 
-    new_db(pool.clone()).await?;
+    if create_db {
+        new_db(pool.clone()).await?;
+    }
 
     let cancel = tokio::spawn(signal::ctrl_c());
     tokio::pin!(cancel);
@@ -129,6 +132,7 @@ fn get_server_future(pool: Pool<Sqlite>) -> impl Future<Output = Result<(), hype
 }
 
 async fn new_db(pool: Pool<Sqlite>) -> ApiResult<()> {
+    warn!("Running schema setup script");
     sqlx::query(&String::from_utf8_lossy(include_bytes!(
         "../create_tables.sql"
     )))

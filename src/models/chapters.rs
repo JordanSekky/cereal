@@ -41,12 +41,10 @@ pub struct ChapterClient {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum ChapterMetadata {
     RoyalRoad {
-        id: u64,
+        royalroad_book_id: u64,
+        royalroad_chapter_id: u64,
     },
     Pale {
-        url: String,
-    },
-    TheWanderingInn {
         url: String,
     },
     TheWanderingInnPatreon {

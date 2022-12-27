@@ -14,9 +14,8 @@ pub struct BookClient {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum BookMetadata {
-    RoyalRoad(u64),
+    RoyalRoad { book_id: u64 },
     Pale,
-    TheWanderingInn,
     TheWanderingInnPatreon,
     TheDailyGrindPatreon,
     ApparatusOfChangePatreon,

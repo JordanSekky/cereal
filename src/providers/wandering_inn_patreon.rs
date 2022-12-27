@@ -55,10 +55,10 @@ pub struct WanderingInnPatreonChapterBodyProvider {
 #[async_trait]
 impl ChapterBodyProvider for WanderingInnPatreonChapterBodyProvider {
     #[instrument(skip(self))]
-    async fn fetch_chapter_body(&self, chapter: &Chapter) -> anyhow::Result<Vec<u8>> {
+    async fn fetch_chapter_body(&self, _chapter: &Chapter) -> anyhow::Result<Vec<u8>> {
         let url = self.url.clone();
         let password = self.password.clone();
-        Ok(get_chapter_body(&url, password.as_deref(), chapter)
+        Ok(get_chapter_body(&url, password.as_deref())
             .await?
             .as_bytes()
             .into())
@@ -223,11 +223,7 @@ fn chapter_title_from_link(link: &str) -> Option<&str> {
 }
 
 #[tracing::instrument(name = "Fetching chapter text from link.", level = "info")]
-pub async fn get_chapter_body(
-    url: &str,
-    password: Option<&str>,
-    chapter: &Chapter,
-) -> anyhow::Result<String> {
+pub async fn get_chapter_body(url: &str, password: Option<&str>) -> anyhow::Result<String> {
     let reqwest_client = reqwest::Client::builder().cookie_store(true).build()?;
     if let Some(password) = password {
         let mut form_data = HashMap::with_capacity(2);
@@ -252,7 +248,5 @@ pub async fn get_chapter_body(
     if body.trim().is_empty() {
         bail!("Failed to find chapter body.");
     }
-    let mut header = format!("<h1>{}: {}</h1>", "The Wandering Inn", chapter.title);
-    header.push_str(&body);
     Ok(body)
 }

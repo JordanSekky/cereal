@@ -64,7 +64,7 @@ pub async fn get_chapters(
         .into_iter()
         // Object must be newer than the most recent delivered chapter.
         .filter(|x| match x.last_modified.as_ref() {
-            Some(lm) => match DateTime::parse_from_rfc2822(lm) {
+            Some(lm) => match DateTime::parse_from_rfc3339(lm) {
                 Ok(published_at) => {
                     if let Some(last_publish_date) = last_publish_date {
                         published_at > *last_publish_date

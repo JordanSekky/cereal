@@ -7,12 +7,14 @@ pub enum ApiError {
     InvalidRequest(String),
     #[error("Resource of type {resource_type} with id {id:?} not found.")]
     ResourceNotFound { resource_type: String, id: String },
-    #[error("Failed to serialize a value to json")]
+    #[error("Failed to serialize a value to json: {0}")]
     Serialization(#[from] serde_json::Error),
-    #[error("A database error occurred")]
+    #[error("A database error occurred: {0}")]
     Database(#[from] sqlx::Error),
-    #[error("A server error occurred")]
+    #[error("A server error occurred: {0}")]
     TowerServer(#[from] hyper::Error),
+    #[error("An io error occurred: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 pub type ApiResult<T> = Result<T, ApiError>;

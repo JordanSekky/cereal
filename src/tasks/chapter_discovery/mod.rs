@@ -25,7 +25,7 @@ pub async fn check_for_new_chap_loop(pool: Pool<Sqlite>) {
                     futures.push(check_for_new_chapters_in_book(book.id, &pool));
                 }
             }
-            Err(e) => error!("Error fetching books with subscribers {}", e),
+            Err(e) => error!("Error fetching books {}", e),
         }
         join_all(futures).await;
     }
