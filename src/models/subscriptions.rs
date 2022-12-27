@@ -145,7 +145,7 @@ impl SubscriptionClient {
     pub async fn list_subscriptions(&self, subscriber_id: &Uuid) -> ApiResult<Vec<Subscription>> {
         let subscriptions = sqlx::query_as::<_, Subscription>(
             "
-        SELECT * FROM subscribers 
+        SELECT * FROM subscriptions 
         WHERE subscriber_id = ?",
         )
         .bind(subscriber_id.as_bytes().as_slice())

@@ -22,6 +22,7 @@ use scraper::{Html, Selector};
 use selectors::Element;
 use tokio::io::AsyncReadExt;
 use tracing::info;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::models::Chapter;
@@ -53,6 +54,7 @@ pub struct WanderingInnPatreonChapterBodyProvider {
 
 #[async_trait]
 impl ChapterBodyProvider for WanderingInnPatreonChapterBodyProvider {
+    #[instrument(skip(self))]
     async fn fetch_chapter_body(&self, chapter: &Chapter) -> anyhow::Result<Vec<u8>> {
         let url = self.url.clone();
         let password = self.password.clone();

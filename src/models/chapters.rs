@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqliteRow, Pool, Row, Sqlite};
 use tracing::{error, info_span, instrument, Instrument};
@@ -11,7 +11,7 @@ use crate::{
 
 use super::decode_uuid;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone, Eq)]
 pub struct NewChapter {
     pub title: String,
     pub metadata: ChapterMetadata,
@@ -21,11 +21,24 @@ pub struct NewChapter {
     pub published_at: Option<chrono::DateTime<Utc>>,
 }
 
+impl std::fmt::Debug for NewChapter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NewChapter")
+            .field("title", &self.title)
+            .field("metadata", &self.metadata)
+            .field("book_id", &self.book_id)
+            .field("html_bytes", &self.html.as_ref().map(|x| x.len()))
+            .field("epub_bytes", &self.epub.as_ref().map(|x| x.len()))
+            .field("published_at", &self.published_at)
+            .finish()
+    }
+}
+
 pub struct ChapterClient {
     pool: Pool<Sqlite>,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum ChapterMetadata {
     RoyalRoad {
         id: u64,
@@ -66,7 +79,7 @@ impl ChapterMetadata {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(PartialEq, Clone, Serialize)]
 pub struct Chapter {
     pub id: Uuid,
     pub title: String,
@@ -81,6 +94,22 @@ pub struct Chapter {
     pub created_at: chrono::DateTime<Utc>,
     #[serde(rename = "updatedAt")]
     pub updated_at: chrono::DateTime<Utc>,
+}
+
+impl std::fmt::Debug for Chapter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Chapter")
+            .field("id", &self.id)
+            .field("title", &self.title)
+            .field("metadata", &self.metadata)
+            .field("book_id", &self.book_id)
+            .field("html_bytes", &self.html.as_ref().map(|x| x.len()))
+            .field("epub_bytes", &self.epub.as_ref().map(|x| x.len()))
+            .field("published_at", &self.published_at)
+            .field("created_at", &self.created_at)
+            .field("updated_at", &self.updated_at)
+            .finish()
+    }
 }
 
 impl<'r> sqlx::FromRow<'r, SqliteRow> for Chapter {
@@ -246,7 +275,10 @@ impl ChapterClient {
     }
 
     #[instrument(skip(self))]
-    pub async fn most_recent_chapter(&self, book_id: &Uuid) -> ApiResult<Option<Chapter>> {
+    pub async fn most_recent_chapter_by_published_at(
+        &self,
+        book_id: &Uuid,
+    ) -> ApiResult<Option<Chapter>> {
         let book = sqlx::query_as::<_, Chapter>("SELECT * FROM chapters WHERE book_id = ? ORDER BY coalesce(published_at, created_at) DESC LIMIT 1")
             .bind(book_id.as_bytes().as_slice())
             .fetch_optional(&self.pool)
@@ -256,9 +288,50 @@ impl ChapterClient {
     }
 
     #[instrument(skip(self))]
+    pub async fn most_recent_chapter_by_created_at(
+        &self,
+        book_id: &Uuid,
+    ) -> ApiResult<Option<Chapter>> {
+        let book = sqlx::query_as::<_, Chapter>(
+            "SELECT * FROM chapters WHERE book_id = ? ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind(book_id.as_bytes().as_slice())
+        .fetch_optional(&self.pool)
+        .instrument(info_span!("Querying db"))
+        .await?;
+        Ok(book)
+    }
+
+    #[instrument(skip(self))]
     pub async fn list_chapters_without_bodies(&self) -> ApiResult<Vec<Chapter>> {
         let chapters =
             sqlx::query_as::<_, Chapter>("SELECT * FROM chapters where html IS NULL ORDER BY coalesce(published_at, created_at) DESC")
+                .fetch_all(&self.pool)
+                .instrument(info_span!("Querying db"))
+                .await?;
+        Ok(chapters)
+    }
+
+    #[instrument(skip(self))]
+    pub async fn list_chapters_ready_for_epub_conversion(&self) -> ApiResult<Vec<Chapter>> {
+        let chapters =
+            sqlx::query_as::<_, Chapter>("SELECT * FROM chapters WHERE html IS NOT NULL AND epub IS NULL ORDER BY coalesce(published_at, created_at) DESC")
+                .fetch_all(&self.pool)
+                .instrument(info_span!("Querying db"))
+                .await?;
+        Ok(chapters)
+    }
+
+    #[instrument(skip(self))]
+    pub async fn list_chapters_with_epub(
+        &self,
+        book_id: &Uuid,
+        datetime: Option<&DateTime<Utc>>,
+    ) -> ApiResult<Vec<Chapter>> {
+        let chapters =
+            sqlx::query_as::<_, Chapter>("SELECT * FROM chapters WHERE epub IS NOT NULL AND coalesce(created_at > ?,  true) AND book_id = ? ORDER BY coalesce(published_at, created_at) ASC")
+            .bind(datetime)
+            .bind(book_id.as_bytes().as_slice())
                 .fetch_all(&self.pool)
                 .instrument(info_span!("Querying db"))
                 .await?;

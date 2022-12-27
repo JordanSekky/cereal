@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use futures::future::join_all;
 use sqlx::{Pool, Sqlite};
 use tokio::time::MissedTickBehavior;
 use tracing::{error, info, instrument};
@@ -16,23 +17,29 @@ pub async fn check_for_bodiless_chap_loop(pool: Pool<Sqlite>) {
         // First tick completes immediately.
         interval.tick().await;
         let chapters = client.list_chapters_without_bodies().await;
+        let mut futures = Vec::new();
         match chapters {
             Ok(chapters) => {
                 for chapter in chapters {
-                    fetch_chapter_body(&chapter, &pool).await
+                    futures.push(fetch_chapter_body(chapter, &pool));
                 }
             }
             Err(e) => error!("Error fetching chapters with empty bodies {}", e),
         }
+        join_all(futures).await;
     }
 }
 
 #[instrument(skip(pool))]
-pub async fn fetch_chapter_body(chapter: &Chapter, pool: &Pool<Sqlite>) {
+pub async fn fetch_chapter_body(chapter: Chapter, pool: &Pool<Sqlite>) {
     let client = ChapterClient::new(pool);
 
-    let chapter_provider = chapter.metadata.body_provider();
-    let chapter_body = chapter_provider.fetch_chapter_body(chapter).await;
+    let chapter_provider = match chapter.metadata.body_provider() {
+        Some(x) => x,
+        None => return,
+    };
+
+    let chapter_body = chapter_provider.fetch_chapter_body(&chapter).await;
     let chapter_body = match chapter_body {
         Ok(x) => x,
         Err(e) => {

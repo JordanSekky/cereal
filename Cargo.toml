@@ -23,7 +23,8 @@ mailparse = "0.14.0"
 opentelemetry = { version = "0.18.0", features = ["rt-tokio"] }
 opentelemetry-otlp = "0.11.0"
 opentelemetry-semantic-conventions = "0.10.0"
-reqwest = { version = "0.11.13", features = ["rustls-tls", "cookies"] }
+rand = "0.8.5"
+reqwest = { version = "0.11.13", features = ["rustls-tls", "cookies", "json"] }
 rusoto_core = { version = "0.48.0", default_features=false, features = ["rustls"] }
 rusoto_s3 = { version = "0.48.0", default_features=false, features = ["rustls"] }
 scraper = "0.14.0"

@@ -44,19 +44,19 @@ impl BookMetadata {
 }
 
 impl ChapterMetadata {
-    pub fn body_provider(&self) -> Box<dyn ChapterBodyProvider + Send + Sync> {
+    pub fn body_provider(&self) -> Option<Box<dyn ChapterBodyProvider + Send + Sync>> {
         match self {
             ChapterMetadata::TheWanderingInnPatreon { url, password } => {
-                Box::new(WanderingInnPatreonChapterBodyProvider {
+                Some(Box::new(WanderingInnPatreonChapterBodyProvider {
                     url: url.clone(),
                     password: password.clone(),
-                })
+                }))
             }
-            ChapterMetadata::RoyalRoad { id } => todo!(),
-            ChapterMetadata::Pale { url } => todo!(),
-            ChapterMetadata::TheWanderingInn { url } => todo!(),
-            ChapterMetadata::TheDailyGrindPatreon => todo!(),
-            ChapterMetadata::ApparatusOfChangePatreon => todo!(),
+            ChapterMetadata::TheDailyGrindPatreon => None,
+            ChapterMetadata::ApparatusOfChangePatreon => None,
+            ChapterMetadata::RoyalRoad { id: _ } => todo!(),
+            ChapterMetadata::Pale { url: _ } => todo!(),
+            ChapterMetadata::TheWanderingInn { url: _ } => todo!(),
         }
     }
 }

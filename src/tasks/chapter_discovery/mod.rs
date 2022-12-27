@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use futures::future::join_all;
 use sqlx::{Pool, Sqlite};
 use tokio::time::MissedTickBehavior;
 use tracing::{error, info, instrument};
@@ -17,21 +18,23 @@ pub async fn check_for_new_chap_loop(pool: Pool<Sqlite>) {
         // First tick completes immediately.
         interval.tick().await;
         let books = client.list_books().await;
+        let mut futures = Vec::new();
         match books {
             Ok(books) => {
                 for book in books {
-                    check_for_new_chapters_in_book(&book.id, &pool).await
+                    futures.push(check_for_new_chapters_in_book(book.id, &pool));
                 }
             }
             Err(e) => error!("Error fetching books with subscribers {}", e),
         }
+        join_all(futures).await;
     }
 }
 
 #[instrument(skip(pool))]
-pub async fn check_for_new_chapters_in_book(book_id: &Uuid, pool: &Pool<Sqlite>) {
+pub async fn check_for_new_chapters_in_book(book_id: Uuid, pool: &Pool<Sqlite>) {
     let client = ChapterClient::new(pool);
-    let most_recent_chapter = match client.most_recent_chapter(book_id).await {
+    let most_recent_chapter = match client.most_recent_chapter_by_created_at(&book_id).await {
         Ok(x) => x,
         Err(e) => {
             error!(
@@ -41,8 +44,8 @@ pub async fn check_for_new_chapters_in_book(book_id: &Uuid, pool: &Pool<Sqlite>)
             return;
         }
     };
-    let most_recent_chapter_published_at = most_recent_chapter.and_then(|x| x.published_at);
-    let book = match BookClient::new(pool).get_book(book_id).await {
+    let most_recent_chapter_created_at = most_recent_chapter.map(|x| x.created_at);
+    let book = match BookClient::new(pool).get_book(&book_id).await {
         Ok(book) => match book {
             Some(book) => book,
             None => {
@@ -58,7 +61,7 @@ pub async fn check_for_new_chapters_in_book(book_id: &Uuid, pool: &Pool<Sqlite>)
 
     let chapter_provider = book.metadata.chapter_provider();
     let new_chapters = chapter_provider
-        .fetch_new_chapters(book_id, most_recent_chapter_published_at.as_ref())
+        .fetch_new_chapters(&book_id, most_recent_chapter_created_at.as_ref())
         .await;
 
     let new_chapters = match new_chapters {

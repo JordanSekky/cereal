@@ -250,6 +250,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
+ "rand 0.8.5",
  "reqwest",
  "rusoto_core",
  "rusoto_s3",

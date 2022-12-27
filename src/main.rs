@@ -27,7 +27,7 @@ pub struct AppState {
     pool: Pool<Sqlite>,
 }
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> ApiResult<()> {
     configure_tracing();
 
@@ -47,6 +47,12 @@ async fn main() -> ApiResult<()> {
     ));
     let mut chapter_body_fetcher = Box::pin(tokio::spawn(
         tasks::chapter_body_hydration::check_for_bodiless_chap_loop(pool.clone()),
+    ));
+    let mut chapter_epub_converter = Box::pin(tokio::spawn(
+        tasks::chapter_body_conversion::check_for_epubless_chap_loop(pool.clone()),
+    ));
+    let mut mailman = Box::pin(tokio::spawn(
+        tasks::delivery::check_for_ready_delivery_loop(pool.clone()),
     ));
     loop {
         tokio::select! {
@@ -74,8 +80,24 @@ async fn main() -> ApiResult<()> {
                     Ok(_) => error!("Chapter body fetch returned OK. This should not be possible."),
                     Err(err) => error!(?err, "Chapter body fetch has paniced. This should not be possible."),
                 };
-                check_for_new_chapters.set(tokio::spawn(tasks::chapter_body_hydration::check_for_bodiless_chap_loop(pool.clone())));
+                chapter_body_fetcher.set(tokio::spawn(tasks::chapter_body_hydration::check_for_bodiless_chap_loop(pool.clone())));
 
+            }
+            x = &mut chapter_epub_converter => {
+                error!("Chapter epub converter thread failed. Restarting the thread.");
+                match x {
+                    Ok(_) => error!("Chapter epub converter thread returned OK. This should not be possible."),
+                    Err(err) => error!(?err, "Chapter epub converter thread has paniced. This should not be possible."),
+                };
+                chapter_epub_converter.set(tokio::spawn(tasks::chapter_body_conversion::check_for_epubless_chap_loop(pool.clone())));
+            }
+            x = &mut mailman => {
+                error!("Mailman thread failed. Restarting the thread.");
+                match x {
+                    Ok(_) => error!("Mailman thread returned OK. This should not be possible."),
+                    Err(err) => error!(?err, "Mailman thread has paniced. This should not be possible."),
+                };
+                chapter_epub_converter.set(tokio::spawn(tasks::delivery::check_for_ready_delivery_loop(pool.clone())));
             }
             _ = &mut cancel => {
                 println!("Received exit signal, exiting.");
