@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     error::ApiError,
-    models::{Subscription, SubscriptionClient},
+    models::{ChapterClient, Subscription, SubscriptionClient},
     AppState,
 };
 
@@ -34,13 +34,25 @@ async fn create_subscription_handler(
     Json(request): Json<CreateSubscriptionRequest>,
 ) -> Result<Json<Subscription>, ApiError> {
     let pool = state.pool;
-    let client = SubscriptionClient::new(&pool);
-    let subscription = client
+    let subscription_client = SubscriptionClient::new(&pool);
+    let chapter_client = ChapterClient::new(&pool);
+
+    let mut latest_chapter = request.last_delivered_chapter_id;
+    // Request doesn't include a latest chapter id, default to the most recent
+    // chapter, so that creating a subscription doesn't immediately spam.
+    if latest_chapter.is_none() {
+        latest_chapter = chapter_client
+            .most_recent_chapter_by_created_at(&request.book_id)
+            .await?
+            .map(|x| x.id);
+    };
+
+    let subscription = subscription_client
         .create_subscription(
             &request.subscriber_id,
             &request.book_id,
             request.chunk_size.as_ref(),
-            request.last_delivered_chapter_id.as_ref(),
+            latest_chapter.as_ref(),
         )
         .await?;
 
