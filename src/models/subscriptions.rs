@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::error::{ApiError, ApiResult};
 
-use super::{decode_optional_uuid, decode_uuid, BookClient, SubscriberClient};
+use super::{decode_optional_uuid, decode_uuid, BookClient, ChapterClient, SubscriberClient};
 
 pub struct SubscriptionClient {
     pool: Pool<Sqlite>,
@@ -51,15 +51,16 @@ impl SubscriptionClient {
         SubscriptionClient { pool: pool.clone() }
     }
 
-    #[instrument(skip(self))]
     pub async fn create_subscription(
         &self,
         subscriber_id: &Uuid,
         book_id: &Uuid,
         chunk_size: Option<&i32>,
+        last_delivered_chapter_id: Option<&Uuid>,
     ) -> ApiResult<Subscription> {
         // Sqlite doesn't tell us _which_ foreign key causes an error, so we must do some checks
         let book_client = BookClient::new(&self.pool);
+        let chapter_client = ChapterClient::new(&self.pool);
         let subscriber_client = SubscriberClient::new(&self.pool);
         if book_client
             .get_book(book_id)
@@ -71,6 +72,23 @@ impl SubscriptionClient {
                 resource_type: String::from("book"),
                 id: book_id.to_string(),
             });
+        }
+
+        let mut chapter_created_at = None;
+        if let Some(chapter_id) = last_delivered_chapter_id {
+            let chapter = chapter_client
+                .get_chapter(*chapter_id)
+                .instrument(info_span!("Querying db"))
+                .await?;
+            match chapter {
+                Some(chapter) => chapter_created_at = Some(chapter.created_at),
+                None => {
+                    return Err(ApiError::ResourceNotFound {
+                        resource_type: String::from("chapter"),
+                        id: chapter_id.to_string(),
+                    });
+                }
+            }
         }
 
         if subscriber_client
@@ -86,14 +104,17 @@ impl SubscriptionClient {
         }
 
         let subscription = sqlx::query_as::<_, Subscription>(
-            "INSERT INTO subscriptions(id, book_id, subscriber_id, chunk_size, created_at, updated_at) 
-            VALUES(?, ?, ?, coalesce(?, 1), ?, ?) 
+            "INSERT INTO subscriptions(id, book_id, subscriber_id, chunk_size, last_delivered_chapter_id,
+                last_delivered_chapter_created_at, created_at, updated_at) 
+            VALUES(?, ?, ?, coalesce(?, 1), ?, ?, ?, ?) 
             RETURNING *;",
         )
         .bind(Uuid::new_v4().as_bytes().as_slice())
         .bind(book_id.as_bytes().as_slice())
         .bind(subscriber_id.as_bytes().as_slice())
         .bind(chunk_size)
+        .bind(last_delivered_chapter_id.map(|x| x.as_bytes().as_slice()))
+        .bind(chapter_created_at)
         .bind(Utc::now())
         .bind(Utc::now())
         .fetch_one(&self.pool)

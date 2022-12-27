@@ -1,3 +1,4 @@
+mod mailgun;
 mod pushover;
 use std::time::Duration;
 
@@ -13,6 +14,7 @@ use crate::{
         Book, BookClient, Chapter, ChapterClient, Subscriber, SubscriberClient, Subscription,
         SubscriptionClient,
     },
+    tasks::chapter_body_conversion::generate_multichapter_epub,
 };
 
 pub async fn check_for_ready_delivery_loop(pool: Pool<Sqlite>) {
@@ -106,8 +108,78 @@ async fn deliver_subscription(
         };
     }
 
+    if let Some(kindle_email) = subscriber.kindle_email.clone() {
+        match chapters.len() {
+            1 => {
+                let subject = format!("New Chapter of {}: {}", book.title, chapters[0].title);
+                let result = mailgun::send_epub_file(
+                    chapters[0]
+                        .epub
+                        .as_ref()
+                        .expect("Chapter did not have epub body."),
+                    &kindle_email,
+                    &chapters[0].title,
+                    &subject,
+                )
+                .await;
+                match result {
+                    Ok(_) => info!("Successfully sent kindle email for chapters {:?}", chapters),
+                    Err(e) => {
+                        error!(
+                            "Failed to send kindle email for chapters {:?}: {}",
+                            chapters, e
+                        );
+                        return;
+                    }
+                }
+            }
+            x => {
+                let cover_title = format!(
+                    "{}: {} through {}",
+                    book.title,
+                    chapters[0].title,
+                    chapters[x - 1].title
+                );
+                let bytes = generate_multichapter_epub(&cover_title, &chapters, &book).await;
+                let bytes = match bytes {
+                    Ok(x) => x,
+                    Err(e) => {
+                        error!(
+                            "Failed to create multichapter epub for chapters {:?}: {}",
+                            chapters, e
+                        );
+                        return;
+                    }
+                };
+                let subject = format!(
+                    "{x} New Chapters of {}: {} through {}",
+                    book.title,
+                    chapters[0].title,
+                    chapters[x - 1].title
+                );
+                let result = mailgun::send_epub_file(
+                    &bytes,
+                    &kindle_email,
+                    &format!("{} through {}", chapters[0].title, chapters[x - 1].title),
+                    &subject,
+                )
+                .await;
+                match result {
+                    Ok(_) => info!("Successfully sent kindle email for chapters {:?}", chapters),
+                    Err(e) => {
+                        error!(
+                            "Failed to send kindle email for chapters {:?}: {}",
+                            chapters, e
+                        );
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     let subscription_client = SubscriptionClient::new(pool);
-    let latest_chapter = &chapters[chapters.len() - 1];
+    let latest_chapter = chapters.iter().max_by_key(|x| x.created_at).unwrap();
     let update_result = subscription_client
         .set_last_delivered_chapter(
             &subscription.id,

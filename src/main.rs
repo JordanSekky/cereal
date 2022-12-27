@@ -97,7 +97,7 @@ async fn main() -> ApiResult<()> {
                     Ok(_) => error!("Mailman thread returned OK. This should not be possible."),
                     Err(err) => error!(?err, "Mailman thread has paniced. This should not be possible."),
                 };
-                chapter_epub_converter.set(tokio::spawn(tasks::delivery::check_for_ready_delivery_loop(pool.clone())));
+                mailman.set(tokio::spawn(tasks::delivery::check_for_ready_delivery_loop(pool.clone())));
             }
             _ = &mut cancel => {
                 println!("Received exit signal, exiting.");

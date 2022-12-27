@@ -8,7 +8,7 @@ use tracing::{info, instrument};
 
 use crate::{
     error,
-    models::{BookClient, Chapter, ChapterClient},
+    models::{Book, BookClient, Chapter, ChapterClient},
 };
 
 mod calibre;
@@ -66,10 +66,12 @@ pub async fn generate_chapter_epub(chapter: Chapter, pool: &Pool<Sqlite>) {
         }
     };
 
+    let cover_title = &format!("{}: {}", &book.title, &chapter.title);
+
     let epub_bytes = calibre::generate_epub(
         ".html",
         chapter_body.as_slice(),
-        &format!("{}: {}", &book.title, &chapter.title),
+        cover_title,
         &book.title,
         &book.author,
     )
@@ -101,17 +103,18 @@ pub async fn generate_chapter_epub(chapter: Chapter, pool: &Pool<Sqlite>) {
     };
 }
 
-#[instrument(skip(pool))]
-pub async fn generate_epub_for_chapters(
+#[instrument]
+pub async fn generate_multichapter_epub(
+    cover_title: &str,
     chapters: &[Chapter],
-    pool: &Pool<Sqlite>,
+    book: &Book,
 ) -> anyhow::Result<Vec<u8>> {
     if chapters.is_empty() {
         bail!("Provided chapters slice is empty.");
     }
 
-    if !chapters.iter().map(|x| x.book_id).all_equal() {
-        bail!("Book ids were not all equal for chapters");
+    if !chapters.iter().all(|x| x.book_id.eq(&book.id)) {
+        bail!("Some chapters were not related to provided book.");
     }
 
     if !chapters.iter().all(|x| x.html.is_some()) {
@@ -128,7 +131,6 @@ pub async fn generate_epub_for_chapters(
         })
         .collect_vec();
 
-    let book_id = chapters[0].book_id;
     let html_body: Vec<u8> = chapters
         .iter()
         .flat_map(|x| {
@@ -138,31 +140,10 @@ pub async fn generate_epub_for_chapters(
         })
         .collect();
 
-    let book = match BookClient::new(pool).get_book(&book_id).await {
-        Ok(Some(book)) => book,
-        Ok(None) => {
-            bail!("Book with id {} not found", &book_id);
-        }
-        Err(e) => {
-            bail!(
-                "A database error occurred looking up book with id {}: {}",
-                &book_id,
-                e
-            );
-        }
-    };
-
-    let epub_title = format!(
-        "{}: {} through {}",
-        book.title,
-        chapters[0].title,
-        chapters[chapters.len() - 1].title
-    );
-
     let epub_bytes = calibre::generate_epub(
         ".html",
         html_body.as_slice(),
-        &epub_title,
+        cover_title,
         &book.title,
         &book.author,
     )

@@ -16,6 +16,7 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CreateSubscriptionRequest {
     #[serde(rename = "subscriberId")]
     subscriber_id: Uuid,
@@ -23,6 +24,8 @@ struct CreateSubscriptionRequest {
     book_id: Uuid,
     #[serde(rename = "chunkSize")]
     chunk_size: Option<i32>,
+    #[serde(rename = "lastDeliveredChapterId")]
+    last_delivered_chapter_id: Option<Uuid>,
 }
 
 #[instrument(skip(state))]
@@ -37,6 +40,7 @@ async fn create_subscription_handler(
             &request.subscriber_id,
             &request.book_id,
             request.chunk_size.as_ref(),
+            request.last_delivered_chapter_id.as_ref(),
         )
         .await?;
 
@@ -44,6 +48,7 @@ async fn create_subscription_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct UpdateSubscriptionRequest {
     id: Uuid,
     #[serde(rename = "chunkSize")]
@@ -82,6 +87,7 @@ async fn update_subscription_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct GetSubscriptionRequest {
     id: Uuid,
 }
@@ -104,6 +110,7 @@ async fn get_subscription_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ListSubscriptionsRequest {
     subscriber_id: Uuid,
 }
@@ -125,6 +132,7 @@ async fn list_subscriptions_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct DeleteSubscriptionRequest {
     id: Uuid,
 }

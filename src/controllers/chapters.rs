@@ -16,11 +16,14 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CreateChapterRequest {
     #[serde(rename = "bookId")]
     book_id: Uuid,
     title: String,
     metadata: ChapterMetadata,
+    #[serde(rename = "publishedAt")]
+    published_at: Option<DateTime<Utc>>,
 }
 
 #[instrument(skip(state))]
@@ -37,13 +40,14 @@ async fn create_chapter_handler(
             &request.metadata,
             None,
             None,
-            None,
+            request.published_at,
         )
         .await?;
     Ok(chapter.into())
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct UpdateChapterRequest {
     id: Uuid,
     title: Option<String>,
@@ -85,6 +89,7 @@ async fn update_chapter_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct GetChapterRequest {
     id: Uuid,
 }
@@ -107,6 +112,7 @@ async fn get_chapter_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ListChaptersRequest {
     #[serde(rename = "bookId")]
     book_id: Uuid,
@@ -129,6 +135,7 @@ async fn list_chapters_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct DeleteChapterRequest {
     id: Uuid,
 }

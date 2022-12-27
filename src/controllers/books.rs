@@ -16,6 +16,7 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CreateBookRequest {
     title: String,
     author: String,
@@ -36,6 +37,7 @@ async fn create_book_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct UpdateBookRequest {
     id: Uuid,
     title: Option<String>,
@@ -76,6 +78,7 @@ async fn update_book_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct GetBookRequest {
     id: Uuid,
 }
@@ -112,6 +115,7 @@ async fn list_books_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct DeleteBookRequest {
     id: Uuid,
 }

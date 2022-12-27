@@ -16,6 +16,7 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CreateSubscriberRequest {
     name: String,
     kindle_email: Option<String>,
@@ -40,6 +41,7 @@ async fn create_subscriber_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct UpdateSubscriberRequest {
     id: Uuid,
     name: Option<String>,
@@ -87,6 +89,7 @@ async fn update_subscriber_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct GetSubscriberRequest {
     id: Uuid,
 }
@@ -124,6 +127,7 @@ async fn list_subscribers_handler(
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct DeleteSubscriberRequest {
     id: Uuid,
 }
