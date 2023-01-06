@@ -127,7 +127,7 @@ fn get_server_future(pool: Pool<Sqlite>) -> impl Future<Output = Result<(), hype
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     axum::Server::bind(&addr).serve(app.into_make_service_with_connect_info::<SocketAddr>())
 }
 
