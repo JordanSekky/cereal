@@ -242,6 +242,7 @@ pub async fn get_chapter_body(url: &str, password: Option<&str>) -> anyhow::Resu
                 Method::POST,
                 "https://wanderinginn.com/wp-login.php?action=postpass",
             )
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/110.0")
             .form(&form_data)
             .send()
             .await?;
