@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use futures::future::try_join_all;
+use itertools::Chunk;
 use itertools::Itertools;
 use mailparse::MailHeaderMap;
 use reqwest::Method;
@@ -187,7 +188,14 @@ async fn get_new_chapter_from_email(
         .map(|x| x.next_sibling_element().map(|sib| sib.text().join("")))
         .exactly_one()
         .ok()
-        .flatten();
+        .flatten()
+        .or_else(|| {
+            doc.select(&para_tags_selector)
+                .flat_map(|x| x.text())
+                .skip_while(|x| !x.to_lowercase().contains("password"))
+                .nth(1)
+                .map(|x| x.to_owned())
+        });
     tracing::info!("Found password {:?}", password);
 
     let links_selector = Selector::parse("div > p a").unwrap();
