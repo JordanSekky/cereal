@@ -237,7 +237,7 @@ pub async fn get_chapter_body(url: &str, password: Option<&str>) -> anyhow::Resu
         let mut form_data = HashMap::with_capacity(2);
         form_data.insert("post_password", password);
         form_data.insert("Submit", "Enter");
-        let _password_submit_result = reqwest_client
+        let password_submit_result = reqwest_client
             .request(
                 Method::POST,
                 "https://wanderinginn.com/wp-login.php?action=postpass",
@@ -245,6 +245,7 @@ pub async fn get_chapter_body(url: &str, password: Option<&str>) -> anyhow::Resu
             .form(&form_data)
             .send()
             .await?;
+        tracing::info!("Submitted password: {:?}", password_submit_result);
     }
     let res = reqwest_client.get(url).send().await?.text().await?;
     let doc = Html::parse_document(&res);
