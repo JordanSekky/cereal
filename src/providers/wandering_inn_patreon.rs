@@ -230,7 +230,10 @@ pub async fn get_chapter_body(url: &str, password: Option<&str>) -> anyhow::Resu
         form_data.insert("post_password", password);
         form_data.insert("Submit", "Enter");
         let _password_submit_result = reqwest_client
-            .request(Method::POST, "https://wanderinginn.com/wp-pass.php")
+            .request(
+                Method::POST,
+                "https://wanderinginn.com/wp-login.php?action=postpass",
+            )
             .form(&form_data)
             .send()
             .await?;
