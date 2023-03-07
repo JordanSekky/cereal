@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     error::ApiError,
-    models::{Chapter, ChapterClient, ChapterMetadata},
+    models::{Chapter, ChapterClient, ChapterMetadata, ShallowChapter},
     AppState,
 };
 
@@ -120,7 +120,7 @@ struct ListChaptersRequest {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 struct ListChaptersResult {
-    chapters: Vec<Chapter>,
+    chapters: Vec<ShallowChapter>,
 }
 
 #[instrument(skip(state))]
@@ -130,7 +130,7 @@ async fn list_chapters_handler(
 ) -> Result<Json<ListChaptersResult>, ApiError> {
     let pool = state.pool;
     let client = ChapterClient::new(&pool);
-    let chapters = client.list_chapters(&request.book_id).await?;
+    let chapters = client.list_chapters_shallow(&request.book_id).await?;
     Ok(ListChaptersResult { chapters }.into())
 }
 

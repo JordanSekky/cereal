@@ -6,7 +6,7 @@ use sqlx::{sqlite::SqliteRow, Row};
 use uuid::Uuid;
 
 pub use books::{Book, BookClient, BookMetadata};
-pub use chapters::{Chapter, ChapterClient, ChapterMetadata, NewChapter};
+pub use chapters::{Chapter, ChapterClient, ChapterMetadata, NewChapter, ShallowChapter};
 pub use subscribers::{Subscriber, SubscriberClient};
 pub use subscriptions::{Subscription, SubscriptionClient};
 

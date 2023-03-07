@@ -126,6 +126,55 @@ impl<'r> sqlx::FromRow<'r, SqliteRow> for Chapter {
     }
 }
 
+#[derive(PartialEq, Clone, Serialize)]
+pub struct ShallowChapter {
+    pub id: Uuid,
+    pub title: String,
+    pub metadata: ChapterMetadata,
+    #[serde(rename = "bookId")]
+    pub book_id: Uuid,
+    pub html_bytes: Option<i64>,
+    pub epub_bytes: Option<i64>,
+    #[serde(rename = "publishedAt")]
+    pub published_at: Option<chrono::DateTime<Utc>>,
+    #[serde(rename = "createdAt")]
+    pub created_at: chrono::DateTime<Utc>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: chrono::DateTime<Utc>,
+}
+
+impl std::fmt::Debug for ShallowChapter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ShallowChapter")
+            .field("id", &self.id)
+            .field("title", &self.title)
+            .field("metadata", &self.metadata)
+            .field("book_id", &self.book_id)
+            .field("html_bytes", &self.html_bytes)
+            .field("epub_bytes", &self.epub_bytes)
+            .field("published_at", &self.published_at)
+            .field("created_at", &self.created_at)
+            .field("updated_at", &self.updated_at)
+            .finish()
+    }
+}
+
+impl<'r> sqlx::FromRow<'r, SqliteRow> for ShallowChapter {
+    fn from_row(row: &'r SqliteRow) -> core::result::Result<Self, sqlx::Error> {
+        Ok(ShallowChapter {
+            id: decode_uuid(row, "id")?,
+            book_id: decode_uuid(row, "book_id")?,
+            title: row.try_get("title")?,
+            html_bytes: row.try_get("html_bytes")?,
+            epub_bytes: row.try_get("epub_bytes")?,
+            metadata: (row, "metadata").try_into()?,
+            published_at: row.try_get("published_at")?,
+            created_at: row.try_get("created_at")?,
+            updated_at: row.try_get("updated_at")?,
+        })
+    }
+}
+
 impl ChapterClient {
     pub fn new(pool: &Pool<Sqlite>) -> ChapterClient {
         ChapterClient { pool: pool.clone() }
@@ -255,6 +304,17 @@ impl ChapterClient {
     pub async fn list_chapters(&self, book_id: &Uuid) -> ApiResult<Vec<Chapter>> {
         let chapters =
             sqlx::query_as::<_, Chapter>("SELECT * FROM chapters where book_id = ? ORDER BY coalesce(published_at, created_at) DESC")
+                .bind(book_id.as_bytes().as_slice())
+                .fetch_all(&self.pool)
+                .instrument(info_span!("Querying db"))
+                .await?;
+        Ok(chapters)
+    }
+
+    #[instrument(skip(self))]
+    pub async fn list_chapters_shallow(&self, book_id: &Uuid) -> ApiResult<Vec<ShallowChapter>> {
+        let chapters =
+            sqlx::query_as::<_, ShallowChapter>("SELECT id, book_id, title, metadata, length(html) as html_bytes, length(epub) as epub_bytes, published_at, created_at, updated_at FROM chapters where book_id = ? ORDER BY coalesce(published_at, created_at) DESC")
                 .bind(book_id.as_bytes().as_slice())
                 .fetch_all(&self.pool)
                 .instrument(info_span!("Querying db"))
